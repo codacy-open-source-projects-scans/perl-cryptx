@@ -40,6 +40,7 @@ enum ltc_pka_id {
    LTC_PKA_X25519,
    LTC_PKA_ED25519,
    LTC_PKA_DH,
+   LTC_PKA_RSA_PSS,
    LTC_PKA_NUM
 };
 
@@ -62,7 +63,18 @@ int rand_prime(void *N, long len, prng_state *prng, int wprng);
 /* ---- RSA ---- */
 #ifdef LTC_MRSA
 
-/** RSA PKCS style key */
+typedef struct ltc_rsa_parameters {
+   /** PSS/OAEP or PKCS #1 v1.5 style
+    *  0 -> PKCS #1 v1.5, 1 -> PSS/OAEP */
+   int pss_oaep;
+   /** saltLength is only defined for PSS
+    * If saltLength == 0 -> OAEP, else -> PSS */
+   unsigned long saltlen;
+   /** hash and MGF hash algorithms */
+   const char *hash_alg, *mgf1_hash_alg;
+} ltc_rsa_parameters;
+
+/** RSA key */
 typedef struct Rsa_key {
     /** Type of key, PK_PRIVATE or PK_PUBLIC */
     int type;
@@ -82,6 +94,8 @@ typedef struct Rsa_key {
     void *dP;
     /** The d mod (q - 1) CRT param */
     void *dQ;
+    /** Further parameters of the RSA key */
+    ltc_rsa_parameters params;
 } rsa_key;
 
 int rsa_make_key(prng_state *prng, int wprng, int size, long e, rsa_key *key);
@@ -103,10 +117,10 @@ void rsa_free(rsa_key *key);
   rsa_decrypt_key_ex(in, inlen, out, outlen, lparam, lparamlen, hash_idx, -1, LTC_PKCS_1_OAEP, stat, key)
 
 #define rsa_sign_hash(in, inlen, out, outlen, prng, prng_idx, hash_idx, saltlen, key) \
-  rsa_sign_hash_ex(in, inlen, out, outlen, LTC_PKCS_1_PSS, prng, prng_idx, hash_idx, saltlen, key)
+  rsa_sign_hash_ex(in, inlen, out, outlen, LTC_PKCS_1_PSS, prng, prng_idx, hash_idx, hash_idx, saltlen, key)
 
 #define rsa_verify_hash(sig, siglen, hash, hashlen, hash_idx, saltlen, stat, key) \
-  rsa_verify_hash_ex(sig, siglen, hash, hashlen, LTC_PKCS_1_PSS, hash_idx, saltlen, stat, key)
+  rsa_verify_hash_ex(sig, siglen, hash, hashlen, LTC_PKCS_1_PSS, hash_idx, hash_idx, saltlen, stat, key)
 
 #define rsa_sign_saltlen_get_max(hash_idx, key) \
   rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, key)
@@ -130,14 +144,16 @@ int rsa_decrypt_key_ex(const unsigned char *in,             unsigned long  inlen
 int rsa_sign_hash_ex(const unsigned char *in,       unsigned long  inlen,
                            unsigned char *out,      unsigned long *outlen,
                            int            padding,
-                           prng_state    *prng,     int            prng_idx,
-                           int            hash_idx, unsigned long  saltlen,
+                           prng_state    *prng,               int  prng_idx,
+                           int            hash_idx,           int  mgf_hash_idx,
+                           unsigned long  saltlen,
                      const rsa_key       *key);
 
 int rsa_verify_hash_ex(const unsigned char *sig,            unsigned long  siglen,
                        const unsigned char *hash,           unsigned long  hashlen,
                              int            padding,
-                             int            hash_idx,       unsigned long  saltlen,
+                             int            hash_idx,                 int  mgf_hash_idx,
+                             unsigned long  saltlen,
                              int           *stat,     const rsa_key       *key);
 
 int rsa_sign_saltlen_get_max_ex(int padding, int hash_idx, const rsa_key *key);
@@ -284,7 +300,7 @@ typedef struct {
 } ecc_key;
 
 /** Formats of ECC signatures */
-typedef enum ecc_signature_type_ {
+typedef enum ecc_signature_type {
    /* ASN.1 encoded, ANSI X9.62 */
    LTC_ECCSIG_ANSIX962   = 0x0,
    /* raw R, S values */
@@ -294,6 +310,28 @@ typedef enum ecc_signature_type_ {
    /* SSH + ECDSA signature format defined by RFC5656 */
    LTC_ECCSIG_RFC5656    = 0x3,
 } ecc_signature_type;
+
+typedef struct ltc_ecc_sig_opts {
+   /** Signature type */
+   ecc_signature_type type;
+   /** The PRNG to use.
+    *  This must be set in case deterministic signature generation
+    *  according to RFC6979 is not enabled.
+    */
+   prng_state *prng;
+   int wprng;
+
+   /** Enable generation of a recovery ID.
+    *  This must be set in case one requires the recovery ID of a
+    *  signature operation.
+    */
+   int *recid;
+
+   /** The hash algorithm to use when creating a signature.
+    *  Setting this will enable RFC6979 compatible signature generation.
+    */
+   const char *rfc6979_hash_alg;
+} ltc_ecc_sig_opts;
 
 /** the ECC params provided */
 extern const ltc_ecc_curve ltc_ecc_curves[];
@@ -312,22 +350,40 @@ int  ecc_make_key(prng_state *prng, int wprng, int keysize, ecc_key *key);
 int  ecc_make_key_ex(prng_state *prng, int wprng, ecc_key *key, const ltc_ecc_curve *cu);
 void ecc_free(ecc_key *key);
 
+#if defined(LTC_DER)
 int  ecc_export(unsigned char *out, unsigned long *outlen, int type, const ecc_key *key);
 int  ecc_import(const unsigned char *in, unsigned long inlen, ecc_key *key);
 int  ecc_import_ex(const unsigned char *in, unsigned long inlen, ecc_key *key, const ltc_ecc_curve *cu);
 
-int ecc_ansi_x963_export(const ecc_key *key, unsigned char *out, unsigned long *outlen);
-int ecc_ansi_x963_import(const unsigned char *in, unsigned long inlen, ecc_key *key);
-int ecc_ansi_x963_import_ex(const unsigned char *in, unsigned long inlen, ecc_key *key, const ltc_ecc_curve *cu);
+int  ecc_export_openssl(unsigned char *out, unsigned long *outlen, int type, const ecc_key *key);
+int  ecc_import_openssl(const unsigned char *in, unsigned long inlen, ecc_key *key);
+int  ecc_import_pkcs8(const unsigned char *in, unsigned long inlen, const password_ctx *pw_ctx, ecc_key *key);
+int  ecc_import_x509(const unsigned char *in, unsigned long inlen, ecc_key *key);
+#endif
 
-int ecc_export_openssl(unsigned char *out, unsigned long *outlen, int type, const ecc_key *key);
-int ecc_import_openssl(const unsigned char *in, unsigned long inlen, ecc_key *key);
-int ecc_import_pkcs8(const unsigned char *in, unsigned long inlen, const password_ctx *pw_ctx, ecc_key *key);
-int ecc_import_x509(const unsigned char *in, unsigned long inlen, ecc_key *key);
+int  ecc_ansi_x963_export(const ecc_key *key, unsigned char *out, unsigned long *outlen);
+int  ecc_ansi_x963_import(const unsigned char *in, unsigned long inlen, ecc_key *key);
+int  ecc_ansi_x963_import_ex(const unsigned char *in, unsigned long inlen, ecc_key *key, const ltc_ecc_curve *cu);
 
 int  ecc_shared_secret(const ecc_key *private_key, const ecc_key *public_key,
                        unsigned char *out, unsigned long *outlen);
 
+int ecc_sign_hash_v2(const unsigned char    *in,
+                           unsigned long     inlen,
+                           unsigned char    *out,
+                           unsigned long    *outlen,
+                           ltc_ecc_sig_opts *opts,
+                     const       ecc_key    *key);
+
+int ecc_verify_hash_v2(const unsigned char *sig,
+                             unsigned long  siglen,
+                       const unsigned char *hash,
+                             unsigned long  hashlen,
+                          ltc_ecc_sig_opts *opts,
+                                       int *stat,
+                       const       ecc_key *key);
+
+#if defined(LTC_DER)
 int  ecc_encrypt_key(const unsigned char *in,   unsigned long inlen,
                            unsigned char *out,  unsigned long *outlen,
                            prng_state *prng, int wprng, int hash,
@@ -336,31 +392,83 @@ int  ecc_encrypt_key(const unsigned char *in,   unsigned long inlen,
 int  ecc_decrypt_key(const unsigned char *in,  unsigned long  inlen,
                            unsigned char *out, unsigned long *outlen,
                            const ecc_key *key);
+#endif /* LTC_DER */
 
-#define ecc_sign_hash_rfc7518(in_, inlen_, out_, outlen_, prng_, wprng_, key_) \
-   ecc_sign_hash_ex(in_, inlen_, out_, outlen_, prng_, wprng_, LTC_ECCSIG_RFC7518, NULL, key_)
+#define ltc_ecc_sign_hash(i, il, o, ol, p, wp, k)         \
+      ecc_sign_hash_v2(i, il, o, ol,                      \
+                       &(ltc_ecc_sig_opts){               \
+                           .type = LTC_ECCSIG_ANSIX962,   \
+                           .prng = p,                     \
+                           .wprng = wp,                   \
+                        }, k)
+#define ltc_ecc_sign_hash_rfc7518(i, il, o, ol, p, wp, k)    \
+      ecc_sign_hash_v2(i, il, o, ol,                         \
+                       &(ltc_ecc_sig_opts){                  \
+                           .type = LTC_ECCSIG_RFC7518,       \
+                           .prng = p,                        \
+                           .wprng = wp,                      \
+                        }, k)
 
-#define ecc_sign_hash(in_, inlen_, out_, outlen_, prng_, wprng_, key_) \
-   ecc_sign_hash_ex(in_, inlen_, out_, outlen_, prng_, wprng_, LTC_ECCSIG_ANSIX962, NULL, key_)
+#define ltc_ecc_verify_hash(s, sl, h, hl, st, k)          \
+      ecc_verify_hash_v2(s, sl, h, hl,                    \
+                         &(ltc_ecc_sig_opts){             \
+                             .type = LTC_ECCSIG_ANSIX962, \
+                          }, st, k)
+#define ltc_ecc_verify_hash_rfc7518(s, sl, h, hl, st, k)     \
+      ecc_verify_hash_v2(s, sl, h, hl,                       \
+                         &(ltc_ecc_sig_opts){                \
+                             .type = LTC_ECCSIG_RFC7518,     \
+                          }, st, k)
 
-#define ecc_verify_hash_rfc7518(sig_, siglen_, hash_, hashlen_, stat_, key_) \
-   ecc_verify_hash_ex(sig_, siglen_, hash_, hashlen_, LTC_ECCSIG_RFC7518, stat_, key_)
+#ifdef LTC_NO_DEPRECATED_APIS
+#define ecc_sign_hash ltc_ecc_sign_hash
+#define ecc_verify_hash ltc_ecc_verify_hash
+#define ecc_sign_hash_rfc7518 ltc_ecc_sign_hash_rfc7518
+#define ecc_verify_hash_rfc7518 ltc_ecc_verify_hash_rfc7518
+#else /* LTC_NO_DEPRECATED_APIS */
+#if defined(LTC_DER)
+LTC_DEPRECATED(ecc_sign_hash_v2)
+int ecc_sign_hash(const unsigned char *in,
+                        unsigned long  inlen,
+                        unsigned char *out,
+                        unsigned long *outlen,
+                           prng_state *prng,
+                                  int  wprng,
+                  const       ecc_key *key);
 
-#define ecc_verify_hash(sig_, siglen_, hash_, hashlen_, stat_, key_) \
-   ecc_verify_hash_ex(sig_, siglen_, hash_, hashlen_, LTC_ECCSIG_ANSIX962, stat_, key_)
+LTC_DEPRECATED(ecc_verify_hash_v2)
+int ecc_verify_hash(const unsigned char *sig,
+                          unsigned long  siglen,
+                    const unsigned char *hash,
+                          unsigned long  hashlen,
+                                    int *stat,
+                    const       ecc_key *key);
+#endif /* LTC_DER */
 
-int  ecc_sign_hash_ex(const unsigned char *in,  unsigned long inlen,
-                            unsigned char *out, unsigned long *outlen,
-                            prng_state *prng, int wprng, ecc_signature_type sigformat,
-                            int *recid, const ecc_key *key);
+LTC_DEPRECATED(ecc_sign_hash_v2)
+int ecc_sign_hash_rfc7518(const unsigned char *in,
+                                unsigned long  inlen,
+                                unsigned char *out,
+                                unsigned long *outlen,
+                                   prng_state *prng,
+                                          int  wprng,
+                          const       ecc_key *key);
 
-int  ecc_verify_hash_ex(const unsigned char *sig,  unsigned long siglen,
-                        const unsigned char *hash, unsigned long hashlen,
-                        ecc_signature_type sigformat, int *stat, const ecc_key *key);
+LTC_DEPRECATED(ecc_verify_hash_v2)
+int ecc_verify_hash_rfc7518(const unsigned char *sig,
+                                  unsigned long  siglen,
+                            const unsigned char *hash,
+                                  unsigned long  hashlen,
+                                            int *stat,
+                            const       ecc_key *key);
+#endif /* LTC_NO_DEPRECATED_APIS */
 
-int  ecc_recover_key(const unsigned char *sig,  unsigned long siglen,
-                     const unsigned char *hash, unsigned long hashlen,
-                     int recid, ecc_signature_type sigformat, ecc_key *key);
+int  ecc_recover_key(const unsigned char *sig,
+                           unsigned long  siglen,
+                     const unsigned char *hash,
+                           unsigned long  hashlen,
+                        ltc_ecc_sig_opts *opts,
+                                 ecc_key *key);
 
 #endif
 
@@ -655,9 +763,10 @@ typedef struct ltc_asn1_list_ {
 #define LTC_SET_ASN1_CUSTOM_PRIMITIVE(list, index, Class, Tag, Type, Data, Size)          \
    do {                                                                                   \
       int LTC_TMPVAR(SACP) = (index);                                                     \
+      ltc_asn1_list *LTC_TMPVAR(SACP_list) = (list);                        \
       LTC_SET_ASN1(list, LTC_TMPVAR(SACP), LTC_ASN1_CUSTOM_TYPE, Data, Size);             \
       LTC_SET_ASN1_IDENTIFIER(list, LTC_TMPVAR(SACP), Class, LTC_ASN1_PC_PRIMITIVE, Tag); \
-      list[LTC_TMPVAR(SACP)].used = (int)(Type);                                          \
+      LTC_TMPVAR(SACP_list)[LTC_TMPVAR(SACP)].used = (int)(Type);                                          \
    } while (0)
 
 extern const char*          der_asn1_class_to_string_map[];
@@ -776,7 +885,6 @@ int der_encode_object_identifier(const unsigned long *words, unsigned long  nwor
 int der_decode_object_identifier(const unsigned char *in,    unsigned long  inlen,
                                        unsigned long *words, unsigned long *outlen);
 int der_length_object_identifier(const unsigned long *words, unsigned long nwords, unsigned long *outlen);
-unsigned long der_object_identifier_bits(unsigned long x);
 
 /* IA5 STRING */
 int der_encode_ia5_string(const unsigned char *in, unsigned long inlen,
@@ -784,9 +892,6 @@ int der_encode_ia5_string(const unsigned char *in, unsigned long inlen,
 int der_decode_ia5_string(const unsigned char *in, unsigned long inlen,
                                 unsigned char *out, unsigned long *outlen);
 int der_length_ia5_string(const unsigned char *octets, unsigned long noctets, unsigned long *outlen);
-
-int der_ia5_char_encode(int c);
-int der_ia5_value_decode(int v);
 
 /* TELETEX STRING */
 int der_decode_teletex_string(const unsigned char *in, unsigned long inlen,
@@ -799,9 +904,6 @@ int der_encode_printable_string(const unsigned char *in, unsigned long inlen,
 int der_decode_printable_string(const unsigned char *in, unsigned long inlen,
                                 unsigned char *out, unsigned long *outlen);
 int der_length_printable_string(const unsigned char *octets, unsigned long noctets, unsigned long *outlen);
-
-int der_printable_char_encode(int c);
-int der_printable_value_decode(int v);
 
 /* UTF-8 */
 #if (defined(SIZE_MAX) || __STDC_VERSION__ >= 199901L || defined(WCHAR_MAX) || defined(__WCHAR_MAX__) || defined(_WCHAR_T) || defined(_WCHAR_T_DEFINED) || defined (__WCHAR_TYPE__)) && !defined(LTC_NO_WCHAR)
@@ -822,7 +924,6 @@ int der_encode_utf8_string(const wchar_t *in,  unsigned long inlen,
 
 int der_decode_utf8_string(const unsigned char *in,  unsigned long inlen,
                                        wchar_t *out, unsigned long *outlen);
-unsigned long der_utf8_charsize(const wchar_t c);
 int der_length_utf8_string(const wchar_t *in, unsigned long noctets, unsigned long *outlen);
 
 

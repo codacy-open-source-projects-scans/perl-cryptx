@@ -651,7 +651,7 @@ int twofish_test(void)
   unsigned char tmp[2][16];
   int err, i, y;
 
-  for (i = 0; i < (int)(sizeof(tests)/sizeof(tests[0])); i++) {
+  for (i = 0; i < (int)LTC_ARRAY_SIZE(tests); i++) {
     if ((err = twofish_setup(tests[i].key, tests[i].keylen, 0, &key)) != CRYPT_OK) {
        return err;
     }
@@ -701,6 +701,17 @@ int twofish_keysize(int *keysize)
    *keysize = 32;
    return CRYPT_OK;
 }
+
+#undef MDS_POLY
+#undef RS_POLY
+#undef sbox
+#undef mds_column_mult
+#undef S1
+#undef S2
+#undef S3
+#undef S4
+#undef g_func
+#undef g1_func
 
 #endif
 

@@ -66,6 +66,7 @@ static ushort16 s_add_inv(ushort16 x)
    return LOW16(0 - x);
 }
 
+#define s_setup_key s_idea_setup_key
 static int s_setup_key(const unsigned char *key, symmetric_key *skey)
 {
    int i, j;
@@ -225,7 +226,7 @@ int idea_test(void)
       return CRYPT_FAIL_TESTVECTOR;
    }
 
-   for (x = 0; x < (int)(sizeof(tests)/sizeof(tests[0])); x++) {
+   for (x = 0; x < (int)LTC_ARRAY_SIZE(tests); x++) {
       if ((err = idea_setup(tests[x].key, 16, 8, &key)) != CRYPT_OK) {
          return err;
       }
@@ -246,5 +247,12 @@ int idea_test(void)
    return CRYPT_OK;
 #endif
 }
+
+#undef LOW16
+#undef HIGH16
+#undef MUL
+#undef STORE16
+#undef LOAD16
+#undef s_setup_key
 
 #endif

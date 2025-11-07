@@ -8,7 +8,7 @@
   ECC Crypto, Tom St Denis
 */
 
-#ifdef LTC_MECC
+#if defined(LTC_MECC) && defined(LTC_DER)
 
 /**
   Decrypt an ECC encrypted key
@@ -41,7 +41,7 @@ int ecc_decrypt_key(const unsigned char *in,  unsigned long  inlen,
    }
 
    /* decode to find out hash */
-   LTC_SET_ASN1(decode, 0, LTC_ASN1_OBJECT_IDENTIFIER, hashOID, sizeof(hashOID)/sizeof(hashOID[0]));
+   LTC_SET_ASN1(decode, 0, LTC_ASN1_OBJECT_IDENTIFIER, hashOID, LTC_ARRAY_SIZE(hashOID));
    err = der_decode_sequence(in, inlen, decode, 1);
    if (err != CRYPT_OK && err != CRYPT_INPUT_TOO_LONG) {
       return err;

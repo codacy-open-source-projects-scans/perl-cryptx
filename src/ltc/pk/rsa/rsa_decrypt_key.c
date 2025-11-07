@@ -45,23 +45,15 @@ int rsa_decrypt_key_ex(const unsigned char *in,             unsigned long  inlen
   *stat = 0;
 
   /* valid padding? */
-  if ((padding != LTC_PKCS_1_V1_5) &&
-      (padding != LTC_PKCS_1_OAEP)) {
-    return CRYPT_PK_INVALID_PADDING;
-  }
-
-  if (padding == LTC_PKCS_1_OAEP) {
-    /* valid hash ? */
-    if ((err = hash_is_valid(mgf_hash)) != CRYPT_OK) {
-       return err;
-    }
+  if ((err = rsa_key_valid_op(key, LTC_RSA_CRYPT, padding, mgf_hash)) != CRYPT_OK) {
+    return err;
   }
 
   /* get modulus len in bits */
-  modulus_bitlen = mp_count_bits( (key->N));
+  modulus_bitlen = ltc_mp_count_bits( (key->N));
 
   /* outlen must be at least the size of the modulus */
-  modulus_bytelen = mp_unsigned_bin_size( (key->N));
+  modulus_bytelen = ltc_mp_unsigned_bin_size( (key->N));
   if (modulus_bytelen != inlen) {
      return CRYPT_INVALID_PACKET;
   }

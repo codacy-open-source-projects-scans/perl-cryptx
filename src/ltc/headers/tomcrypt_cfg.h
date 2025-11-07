@@ -175,6 +175,11 @@ LTC_EXPORT int   LTC_CALL XSTRCMP(const char *s1, const char *s2);
    #define LTC_FAST
 #endif
 
+/* Detect ILP32, commonly known as x32 on Linux and also possible on AIX */
+#if defined(_ILP32) || defined(__ILP32__)
+   #define ENDIAN_64BITWORD_ILP32
+#endif
+
 /* endianness fallback */
 #if !defined(ENDIAN_BIG) && !defined(ENDIAN_LITTLE)
   #if defined(_BYTE_ORDER) && _BYTE_ORDER == _BIG_ENDIAN || \
@@ -290,6 +295,14 @@ typedef unsigned long ltc_mp_digit;
    #define LTC_HAVE_ROTATE_BUILTIN
 #endif
 
+#if __has_builtin(__builtin_clzl)
+   #define LTC_HAVE_CLZL_BUILTIN
+#endif
+
+#if __has_builtin(__builtin_ctzl)
+   #define LTC_HAVE_CTZL_BUILTIN
+#endif
+
 #if defined(__GNUC__)
    #define LTC_ALIGN(n) __attribute__((aligned(n)))
 #else
@@ -316,20 +329,29 @@ typedef unsigned long ltc_mp_digit;
 #   define LTC_NULL_TERMINATED
 #endif
 
+#ifndef LTC_DEPRECATED
 #if defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__ >= 405)
 #  define LTC_DEPRECATED(s) __attribute__((deprecated("replaced by " #s)))
-#  define PRIVATE_LTC_DEPRECATED_PRAGMA(s) _Pragma(#s)
-#  define LTC_DEPRECATED_PRAGMA(s) PRIVATE_LTC_DEPRECATED_PRAGMA(GCC warning s)
 #elif defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__ >= 301)
 #  define LTC_DEPRECATED(s) __attribute__((deprecated))
-#  define LTC_DEPRECATED_PRAGMA(s)
 #elif defined(_MSC_VER) && _MSC_VER >= 1500
    /* supported since Visual Studio 2008 */
 #  define LTC_DEPRECATED(s) __declspec(deprecated("replaced by " #s))
-#  define LTC_DEPRECATED_PRAGMA(s) __pragma(message(s))
 #else
 #  define LTC_DEPRECATED(s)
+#endif
+#endif
+
+#ifndef LTC_DEPRECATED_PRAGMA
+#if defined(__GNUC__) && (__GNUC__ * 100 + __GNUC_MINOR__ >= 405)
+#  define PRIVATE_LTC_DEPRECATED_PRAGMA(s) _Pragma(#s)
+#  define LTC_DEPRECATED_PRAGMA(s) PRIVATE_LTC_DEPRECATED_PRAGMA(GCC warning s)
+#elif defined(_MSC_VER) && _MSC_VER >= 1500
+   /* supported since Visual Studio 2008 */
+#  define LTC_DEPRECATED_PRAGMA(s) __pragma(message(s))
+#else
 #  define LTC_DEPRECATED_PRAGMA(s)
+#endif
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)

@@ -439,7 +439,7 @@ int rmd160_test(void)
    unsigned char tmp[20];
    hash_state md;
 
-   for (i = 0; i < (int)(sizeof(tests)/sizeof(tests[0])); i++) {
+   for (i = 0; i < (int)LTC_ARRAY_SIZE(tests); i++) {
        rmd160_init(&md);
        rmd160_process(&md, (unsigned char *)tests[i].msg, XSTRLEN(tests[i].msg));
        rmd160_done(&md, tmp);
@@ -451,5 +451,20 @@ int rmd160_test(void)
 #endif
 }
 
-#endif
+#undef F
+#undef G
+#undef H
+#undef I
+#undef J
+#undef FF
+#undef GG
+#undef HH
+#undef II
+#undef JJ
+#undef FFF
+#undef GGG
+#undef HHH
+#undef III
+#undef JJJ
 
+#endif

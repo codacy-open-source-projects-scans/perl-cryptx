@@ -303,6 +303,9 @@ const char *crypt_build_settings =
 #if defined(LTC_CHACHA20POLY1305_MODE)
     "   CHACHA20POLY1305\n"
 #endif
+#if defined(LTC_SIV_MODE)
+    "   SIV\n"
+#endif
 
     "\nPRNG:\n"
 #if defined(LTC_YARROW)
@@ -452,6 +455,7 @@ const char *crypt_build_settings =
 #if defined(LTC_DER)
     " DER "
     " " NAME_VALUE(LTC_DER_MAX_RECURSION) " "
+    " " NAME_VALUE(LTC_DER_OID_DEFAULT_NODES) " "
 #endif
 #if defined(LTC_PKCS_1)
     " PKCS#1 "
@@ -545,6 +549,15 @@ const char *crypt_build_settings =
     " LTC_NO_ROLC "
 #endif
 #endif
+#if defined(LTC_HAVE_ROTATE_BUILTIN)
+    " LTC_HAVE_ROTATE_BUILTIN "
+#endif
+#if defined(LTC_HAVE_CLZL_BUILTIN)
+    " LTC_HAVE_CLZL_BUILTIN "
+#endif
+#if defined(LTC_HAVE_CTZL_BUILTIN)
+    " LTC_HAVE_CTZL_BUILTIN "
+#endif
 #if defined(LTC_NO_TEST)
     " LTC_NO_TEST "
 #endif
@@ -568,6 +581,9 @@ const char *crypt_build_settings =
 #endif
 #if defined(LTC_CLOCK_GETTIME)
     " LTC_CLOCK_GETTIME "
+#endif
+#if defined(LTC_NO_DEPRECATED_APIS)
+    " LTC_NO_DEPRECATED_APIS "
 #endif
     "\n"
     ;

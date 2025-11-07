@@ -192,7 +192,8 @@ SV*
 key2hash(Crypt::PK::ECC self)
     PREINIT:
         HV *rv_hash;
-        long siz, esize;
+        size_t siz;
+        long esize;
         char buf[20001];
         SV **not_used;
     CODE:
@@ -200,7 +201,7 @@ key2hash(Crypt::PK::ECC self)
         esize = ecc_get_size(&self->key);
         rv_hash = newHV();
         /* k */
-        siz = (self->key.k) ? mp_unsigned_bin_size(self->key.k) : 0;
+        siz = (self->key.k) ? mp_ubin_size(self->key.k) : 0;
         if (siz>10000) {
           croak("FATAL: key2hash failed - 'k' too big number");
         }
@@ -212,7 +213,7 @@ key2hash(Crypt::PK::ECC self)
           not_used = hv_store(rv_hash, "k", 1, newSVpv("", 0), 0);
         }
         /* pub_x */
-        siz = (self->key.pubkey.x) ? mp_unsigned_bin_size(self->key.pubkey.x) : 0;
+        siz = (self->key.pubkey.x) ? mp_ubin_size(self->key.pubkey.x) : 0;
         if (siz>10000) {
           croak("FATAL: key2hash failed - 'pub_x' too big number");
         }
@@ -224,7 +225,7 @@ key2hash(Crypt::PK::ECC self)
           not_used = hv_store(rv_hash, "pub_x", 5, newSVpv("", 0), 0);
         }
         /* pub_y */
-        siz = (self->key.pubkey.y) ? mp_unsigned_bin_size(self->key.pubkey.y) : 0;
+        siz = (self->key.pubkey.y) ? mp_ubin_size(self->key.pubkey.y) : 0;
         if (siz>10000) {
           croak("FATAL: key2hash failed - 'pub_y' too big number");
         }
@@ -250,7 +251,7 @@ key2hash(Crypt::PK::ECC self)
           not_used = hv_store(rv_hash, "curve_Gx",                       8, newSVpv(buf, strlen(buf)), 0);
           cryptx_internal_mp2hex_with_leading_zero(self->key.dp.base.y, buf, 20000, 0);
           not_used = hv_store(rv_hash, "curve_Gy",                       8, newSVpv(buf, strlen(buf)), 0);
-          not_used = hv_store(rv_hash, "curve_bytes",                   11, newSViv(mp_unsigned_bin_size(self->key.dp.prime)), 0);
+          not_used = hv_store(rv_hash, "curve_bytes",                   11, newSViv(mp_ubin_size(self->key.dp.prime)), 0);
           not_used = hv_store(rv_hash, "curve_bits",                    10, newSViv(mp_count_bits(self->key.dp.prime)), 0);
 
           if (self->key.dp.oidlen > 0) {
@@ -408,7 +409,7 @@ decrypt(Crypt::PK::ECC self, SV * data)
         RETVAL
 
 SV *
-sign_hash(Crypt::PK::ECC self, SV * data, const char * hash_name = "SHA1")
+sign_hash(Crypt::PK::ECC self, SV * data, const char * hash_name = NULL, const char * hash_rfc6979_name = NULL)
     ALIAS:
         sign_hash_rfc7518    = 3
         sign_message         = 1
@@ -416,13 +417,23 @@ sign_hash(Crypt::PK::ECC self, SV * data, const char * hash_name = "SHA1")
         sign_hash_eth        = 4
     CODE:
     {
-        int rv, id;
+        int rv, id, hash_rfc6979_id, r = -1;
         unsigned char buffer[1024], tmp[MAXBLOCKSIZE], *data_ptr = NULL;
         unsigned long tmp_len = MAXBLOCKSIZE, buffer_len = 1024;
         STRLEN data_len = 0;
+        ltc_ecc_sig_opts sig_opts = { .prng = &self->pstate, .wprng = self->pindex, .type = LTC_ECCSIG_ANSIX962, .recid = &r, .rfc6979_hash_alg = NULL };
+
+        /* Handle dual signature modes for backward compatibility: if only 2 params passed, treat second as RFC6979 hash */
+        if ((ix == 0 || ix == 3 || ix == 4) && hash_name != NULL && hash_rfc6979_name == NULL) {
+          hash_rfc6979_name = hash_name;
+        }
 
         data_ptr = (unsigned char *)SvPVbyte(data, data_len);
         if (ix == 1 || ix == 2) {
+          /* for backward compatibility, if hash_name is NULL, use SHA1 */
+          if (hash_name == NULL) {
+            hash_name = "SHA1";
+          }
           id = cryptx_internal_find_hash(hash_name);
           if (id == -1) croak("FATAL: find_hash failed for '%s'", hash_name);
           rv = hash_memory(id, data_ptr, (unsigned long)data_len, tmp, &tmp_len);
@@ -430,22 +441,28 @@ sign_hash(Crypt::PK::ECC self, SV * data, const char * hash_name = "SHA1")
           data_ptr = tmp;
           data_len = tmp_len;
         }
+
+        if (hash_rfc6979_name != NULL) {
+          /* deterministic signing */
+          hash_rfc6979_id = cryptx_internal_find_hash(hash_rfc6979_name);
+          if (hash_rfc6979_id == -1) croak("FATAL: find_hash failed for rfc6979 hash '%s'", hash_rfc6979_name);
+          sig_opts.rfc6979_hash_alg = hash_descriptor[hash_rfc6979_id].name;
+        }
+
         if (ix == 2 || ix == 3) {
-          rv = ecc_sign_hash_rfc7518(data_ptr, (unsigned long)data_len, buffer, &buffer_len,
-                             &self->pstate, self->pindex,
-                             &self->key);
+          /* rfc7518 */
+          sig_opts.type = LTC_ECCSIG_RFC7518;
         }
         else if (ix == 4) {
-          rv = ecc_sign_hash_ex(data_ptr, (unsigned long)data_len, buffer, &buffer_len,
-                             &self->pstate, self->pindex, LTC_ECCSIG_ETH27, NULL,
-                             &self->key);
+          /* eth27 */
+          sig_opts.type = LTC_ECCSIG_ETH27;
         }
         else {
-          rv = ecc_sign_hash(data_ptr, (unsigned long)data_len, buffer, &buffer_len,
-                             &self->pstate, self->pindex,
-                             &self->key);
+          /* default */
+          sig_opts.type = LTC_ECCSIG_ANSIX962;
         }
-        if (rv != CRYPT_OK) croak("FATAL: ecc_sign_hash_ex failed: %s", error_to_string(rv));
+        rv = ecc_sign_hash_v2(data_ptr, (unsigned long)data_len, buffer, &buffer_len, &sig_opts, &self->key);
+        if (rv != CRYPT_OK) croak("FATAL: ecc_sign_hash_v2 failed: %s", error_to_string(rv));
         RETVAL = newSVpvn((char*)buffer, buffer_len);
     }
     OUTPUT:
@@ -460,10 +477,11 @@ verify_hash(Crypt::PK::ECC self, SV * sig, SV * data, const char * hash_name = "
         verify_hash_eth        = 4
     CODE:
     {
-        int rv, stat, id;
+        int rv, stat, id, r = -1;
         unsigned char tmp[MAXBLOCKSIZE], *data_ptr = NULL, *sig_ptr = NULL;
         unsigned long tmp_len = MAXBLOCKSIZE;
         STRLEN data_len = 0, sig_len = 0;
+        ltc_ecc_sig_opts sig_opts = { .prng = &self->pstate, .wprng = self->pindex, .type = LTC_ECCSIG_ANSIX962, .recid = &r, .rfc6979_hash_alg = NULL };
 
         data_ptr = (unsigned char *)SvPVbyte(data, data_len);
         sig_ptr = (unsigned char *)SvPVbyte(sig, sig_len);
@@ -478,14 +496,18 @@ verify_hash(Crypt::PK::ECC self, SV * sig, SV * data, const char * hash_name = "
         RETVAL = 1;
         stat = 0;
         if (ix == 2 || ix == 3) {
-          rv = ecc_verify_hash_rfc7518(sig_ptr, (unsigned long)sig_len, data_ptr, (unsigned long)data_len, &stat, &self->key);
+          /* rfc7518 */
+          sig_opts.type = LTC_ECCSIG_RFC7518;
         }
         else if (ix == 4) {
-          rv = ecc_verify_hash_ex(sig_ptr, (unsigned long)sig_len, data_ptr, (unsigned long)data_len, LTC_ECCSIG_ETH27, &stat, &self->key);
+          /* eth27 */
+          sig_opts.type = LTC_ECCSIG_ETH27;
         }
         else {
-          rv = ecc_verify_hash(sig_ptr, (unsigned long)sig_len, data_ptr, (unsigned long)data_len, &stat, &self->key);
+          /* default */
+          sig_opts.type = LTC_ECCSIG_ANSIX962;
         }
+        rv = ecc_verify_hash_v2(sig_ptr, (unsigned long)sig_len, data_ptr, (unsigned long)data_len, &sig_opts, &stat, &self->key);
         if (rv != CRYPT_OK || stat != 1) RETVAL = 0;
     }
     OUTPUT:
@@ -513,14 +535,15 @@ recovery_pub(Crypt::PK::ECC self, SV * sig, SV* hash, SV* recid = NULL)
         recovery_pub_eth     = 2
     CODE:
     {
-        int rv;
+        int rv, r = -1;
         unsigned char *sig_ptr = NULL, *hash_ptr = NULL;
         STRLEN hash_len = 0, sig_len = 0;
-        int recovery_id = -1;
+        ltc_ecc_sig_opts sig_opts = { .prng = &self->pstate, .wprng = self->pindex, .type = LTC_ECCSIG_ANSIX962, .recid = &r, .rfc6979_hash_alg = NULL };
 
         if (recid != NULL) {
-          recovery_id = (int) SvIV(recid);
-        } else if (ix != 2) {
+          r = (int) SvIV(recid);
+        }
+        else if (ix != 2) {
           if (ix == 1) {
             croak("FATAL: recovery_pub_rfc7518 requires recid argument");
           } else {
@@ -531,19 +554,15 @@ recovery_pub(Crypt::PK::ECC self, SV * sig, SV* hash, SV* recid = NULL)
         sig_ptr = (unsigned char *)SvPVbyte(sig, sig_len);
         hash_ptr = (unsigned char *)SvPVbyte(hash, hash_len);
         if (ix == 1) {
-          rv = ecc_recover_key(sig_ptr, (unsigned long)sig_len, hash_ptr, (unsigned long) hash_len,
-                               recovery_id, LTC_ECCSIG_RFC7518, &self->key);
+          sig_opts.type = LTC_ECCSIG_RFC7518;
         }
         else if (ix == 2) {
-          // Ethereum's signature contains the recovery id in the last byte of the signature
-          // don't need to pass it as a separate argument
-          rv = ecc_recover_key(sig_ptr, (unsigned long)sig_len, hash_ptr, (unsigned long) hash_len,
-                               recovery_id, LTC_ECCSIG_ETH27, &self->key);
+          sig_opts.type = LTC_ECCSIG_ETH27;
         }
         else {
-          rv = ecc_recover_key(sig_ptr, (unsigned long)sig_len, hash_ptr, (unsigned long) hash_len,
-                               recovery_id, LTC_ECCSIG_ANSIX962, &self->key);
+          sig_opts.type = LTC_ECCSIG_ANSIX962;
         }
+        rv = ecc_recover_key(sig_ptr, (unsigned long)sig_len, hash_ptr, (unsigned long) hash_len, &sig_opts, &self->key);
         if (rv != CRYPT_OK) croak("FATAL: ecc_recover_key failed: %s", error_to_string(rv));
         RETVAL = 1;
     }

@@ -267,7 +267,7 @@ int noekeon_test(void)
  unsigned char tmp[2][16];
  int err, i, y;
 
- for (i = 0; i < (int)(sizeof(tests)/sizeof(tests[0])); i++) {
+ for (i = 0; i < (int)LTC_ARRAY_SIZE(tests); i++) {
     zeromem(&key, sizeof(key));
     if ((err = noekeon_setup(tests[i].key, tests[i].keylen, 0, &key)) != CRYPT_OK) {
        return err;
@@ -312,6 +312,13 @@ int noekeon_keysize(int *keysize)
    *keysize = 16;
    return CRYPT_OK;
 }
+
+#undef kTHETA
+#undef THETA
+#undef GAMMA
+#undef PI1
+#undef PI2
+#undef ROUND
 
 #endif
 

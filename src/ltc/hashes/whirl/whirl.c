@@ -29,8 +29,10 @@ const struct ltc_hash_descriptor whirlpool_desc =
 };
 
 /* the sboxes */
+#ifndef LTC_WHIRLTAB_C
 #define LTC_WHIRLTAB_C
 #include "whirltab.c"
+#endif
 
 /* get a_{i,j} */
 #define GB(a,i,j) ((a[(i) & 7] >> (8 * (j))) & 255)
@@ -279,7 +281,7 @@ int  whirlpool_test(void)
   unsigned char tmp[64];
   hash_state md;
 
-  for (i = 0; i < (int)(sizeof(tests)/sizeof(tests[0])); i++) {
+  for (i = 0; i < (int)LTC_ARRAY_SIZE(tests); i++) {
       whirlpool_init(&md);
       whirlpool_process(&md, (unsigned char *)tests[i].msg, tests[i].len);
       whirlpool_done(&md, tmp);
@@ -291,6 +293,8 @@ int  whirlpool_test(void)
  #endif
 }
 
+#undef GB
+#undef theta_pi_gamma
 
 #endif
 

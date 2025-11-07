@@ -680,7 +680,7 @@ int camellia_test(void)
    int err;
    unsigned int x;
 
-   for (x = 0; x < sizeof(tests)/sizeof(tests[0]); x++) {
+   for (x = 0; x < LTC_ARRAY_SIZE(tests); x++) {
       zeromem(&skey, sizeof(skey));
       if ((err = camellia_setup(tests[x].key, tests[x].keylen, 0, &skey)) != CRYPT_OK) {
          return err;
@@ -716,5 +716,7 @@ int camellia_keysize(int *keysize)
    else return CRYPT_INVALID_KEYSIZE;
    return CRYPT_OK;
 }
+
+#undef loc
 
 #endif

@@ -62,8 +62,10 @@ const struct ltc_cipher_descriptor rijndael_enc_desc =
 
 #endif
 
+#ifndef LTC_AES_TAB_C
 #define LTC_AES_TAB_C
 #include "aes_tab.c"
+#endif
 
 static ulong32 setup_mix(ulong32 temp)
 {
@@ -667,7 +669,7 @@ int ECB_TEST(void)
   unsigned char tmp[2][16];
   int i, y;
 
-  for (i = 0; i < (int)(sizeof(tests)/sizeof(tests[0])); i++) {
+  for (i = 0; i < (int)LTC_ARRAY_SIZE(tests); i++) {
     zeromem(&key, sizeof(key));
     if ((err = rijndael_setup(tests[i].key, tests[i].keylen, 0, &key)) != CRYPT_OK) {
        return err;
@@ -726,5 +728,11 @@ int ECB_KS(int *keysize)
    return CRYPT_OK;
 }
 
-#endif
+#undef SETUP
+#undef ECB_ENC
+#undef ECB_DEC
+#undef ECB_DONE
+#undef ECB_TEST
+#undef ECB_KS
 
+#endif

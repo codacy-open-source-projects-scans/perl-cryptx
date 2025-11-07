@@ -301,6 +301,7 @@
 #define LTC_CCM_MODE
 #define LTC_GCM_MODE
 #define LTC_CHACHA20POLY1305_MODE
+#define LTC_SIV_MODE
 
 /* Use 64KiB tables */
 #ifndef LTC_NO_TABLES
@@ -601,6 +602,10 @@
       /* Maximum recursion limit when processing nested ASN.1 types. */
       #define LTC_DER_MAX_RECURSION 30
    #endif
+   #ifndef LTC_DER_OID_DEFAULT_NODES
+      /* Default number of nodes when decoding an OID. */
+      #define LTC_DER_OID_DEFAULT_NODES 12
+   #endif
 #endif
 
 #if defined(LTC_MECC) || defined(LTC_MRSA) || defined(LTC_MDSA) || defined(LTC_SSH)
@@ -621,9 +626,11 @@
    #define LTC_PKCS_8
 #endif
 
-#ifdef LTC_PKCS_8
+#if defined(LTC_PKCS_8) && defined(LTC_DER)
    #define LTC_PADDING
    #define LTC_PBES
+#else
+   #undef LTC_PKCS_8
 #endif
 
 #if defined(LTC_CLEAN_STACK)
@@ -663,7 +670,7 @@
    #error ASN.1 DER requires MPI functionality
 #endif
 
-#if (defined(LTC_MDSA) || defined(LTC_MRSA) || defined(LTC_MECC)) && !defined(LTC_DER)
+#if (defined(LTC_MDSA) || defined(LTC_MRSA)) && !defined(LTC_DER)
    #error PK requires ASN.1 DER functionality, make sure LTC_DER is enabled
 #endif
 
@@ -706,6 +713,18 @@
 #if defined(LTC_NO_MATH) && (defined(LTM_DESC) || defined(TFM_DESC) || defined(GMP_DESC))
    #error LTC_NO_MATH defined, but also a math descriptor
 #endif
+
+#if !defined(LTC_ECB_MODE)
+#if defined(LTC_CFB_MODE) || defined(LTC_OFB_MODE) || defined(LTC_CBC_MODE) || defined(LTC_CTR_MODE) || \
+    defined(LTC_F8_MODE) || defined(LTC_LRW_MODE) || defined(LTC_XTS_MODE) )
+   #error LTC_ECB_MODE not defined, but all other modes depend on it
+#endif
+#if defined(LTC_OMAC) || defined(LTC_PMAC) || defined(LTC_XCBC) || defined(LTC_F9_MODE) || defined(LTC_EAX_MODE) || \
+    defined(LTC_OCB_MODE) || defined(LTC_OCB3_MODE) || defined(LTC_CCM_MODE) || defined(LTC_GCM_MODE) )
+   #error LTC_ECB_MODE not defined, but most MAC and AEAD modes depend on it
+#endif
+#endif
+
 
 /* THREAD management */
 #ifdef LTC_PTHREAD

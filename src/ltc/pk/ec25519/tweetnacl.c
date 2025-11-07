@@ -4,6 +4,7 @@
 
 /* automatically generated file, do not edit */
 
+#define add tnacl_add
 #define FOR(i,n) for (i = 0;i < n;++i)
 #define sv static void
 
@@ -311,6 +312,7 @@ int tweetnacl_crypto_sk_to_pk(u8 *pk, const u8 *sk)
 {
   u8 d[64];
   gf p[4];
+  if (find_hash("sha512") == -1) return CRYPT_INVALID_HASH;
   tweetnacl_crypto_hash(d, sk, 32);
   d[0] &= 248;
   d[31] &= 127;
@@ -386,6 +388,8 @@ int tweetnacl_crypto_sign(u8 *sm,u64 *smlen,const u8 *m,u64 mlen,const u8 *sk,co
   i64 i,j,x[64];
   gf p[4];
 
+  if (find_hash("sha512") == -1) return CRYPT_INVALID_HASH;
+
   tweetnacl_crypto_hash(d, sk, 32);
   d[0] &= 248;
   d[31] &= 127;
@@ -455,6 +459,7 @@ int tweetnacl_crypto_sign_open(int *stat, u8 *m,u64 *mlen,const u8 *sm,u64 smlen
   gf p[4],q[4];
 
   *stat = 0;
+  if (find_hash("sha512") == -1) return CRYPT_INVALID_HASH;
   if (*mlen < smlen) return CRYPT_BUFFER_OVERFLOW;
   *mlen = -1;
   if (smlen < 64) return CRYPT_INVALID_ARG;
@@ -489,3 +494,7 @@ int tweetnacl_crypto_ph(u8 *out,const u8 *msg,u64 msglen)
 {
   return tweetnacl_crypto_hash(out, msg, msglen);
 }
+
+#undef add
+#undef FOR
+#undef sv
