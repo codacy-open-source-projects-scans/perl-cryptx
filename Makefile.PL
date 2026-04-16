@@ -27,18 +27,12 @@ else {
   );
   $mycflags = " $Config{ccflags} $Config{cccdlflags} $Config{optimize} "; # keep leading + trailing spaces
 
-  my $try_aes_ni = 0;
-  $try_aes_ni = 1 if $Config{archname} =~ /x86_64/;      # x86_64-cygwin-threads-multi / x86_64-linux-thread-multi
-  $try_aes_ni = 1 if $Config{archname} =~ /MSWin32-x64/; # MSWin32-x64-multi-thread
-  $try_aes_ni = 1 if $Config{archname} =~ /amd64/;       # OpenBSD.amd64-openbsd-thread-multi / amd64-freebsd
-  $try_aes_ni = 1 if $Config{archname} =~ /darwin/ && qx(uname -m) =~ /x86_64/; # darwin-thread-multi-2level / darwin-2level
-  $try_aes_ni = 1 if $Config{archname} =~ /i86pc-solaris(-.+)?-64/; # i86pc-solaris-thread-multi-64 / i86pc-solaris-64
-  if ($try_aes_ni && $Config{gccversion}) {
+  if ($Config{gccversion}) {
     my $ver1;
     $ver1 ||= $1 if $Config{gccversion} =~ /^([0-9]+)\./; # gccversion='10.2.0'
     $ver1 ||= $1 if $Config{gccversion} =~ /LLVM ([0-9]+)\./i; # gccversion='Apple LLVM 14.0.0 (clang-1400.0.29.202)'
     $ver1 ||= $1 if $Config{gccversion} =~ /Clang ([0-9]+)\./i; # gccversion='FreeBSD Clang 13.0.0 (git@github.com:llvm/llvm-project.git llvmorg-13.0.0-0-gd7b669b3a303)' or 'OpenBSD Clang 13.0.0'
-    $mycflags .= " -DLTC_AES_NI" if $ver1 > 4; # target attributes are supported since gcc-4.9
+    $mycflags .= " -DLTC_NO_AES_NI" if $ver1 < 5; # target attributes are supported since gcc-4.9
   }
 
   #FIX: this is particularly useful for Debian https://github.com/DCIT/perl-CryptX/pull/39
@@ -54,6 +48,7 @@ else {
   $mycflags =~ s/\s-pedantic-errors\s/ /g;
   $mycflags =~ s/\s-pedantic\s/ /g;
   $mycflags =~ s/\s-std=c89\s/ /g;
+  $mycflags =~ s/\s-std=c99\s/ /g; # with -std=c99 GCC disables asm
   $mycflags =~ s/\s-ansi\s/ /g;
   $mycflags =~ s/\s-Wwrite-strings\s/ /g;
   $mycflags =~ s/\s-Wcast-qual\s/ /g;
