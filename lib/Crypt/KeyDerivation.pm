@@ -2,10 +2,10 @@ package Crypt::KeyDerivation;
 
 use strict;
 use warnings;
-our $VERSION = '0.087_003';
+our $VERSION = '0.088';
 
 require Exporter; our @ISA = qw(Exporter); ### use Exporter 5.57 'import';
-our %EXPORT_TAGS = ( all => [qw(pbkdf1 pbkdf2 hkdf hkdf_expand hkdf_extract bcrypt_pbkdf scrypt_pbkdf argon2_pbkdf)] );
+our %EXPORT_TAGS = ( all => [qw(pbkdf1 pbkdf1_openssl pbkdf2 hkdf hkdf_expand hkdf_extract bcrypt_pbkdf scrypt_pbkdf argon2_pbkdf)] );
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw();
 
@@ -27,10 +27,11 @@ Crypt::KeyDerivation - PBKDF1, PBKDF2, HKDF, Bcrypt, Scrypt, Argon2 key derivati
 
   ### PBKDF1/2
   $derived_key1 = pbkdf1($password, $salt, $iteration_count, $hash_name, $len);
-  $derived_key2 = pbkdf2($password, $salt, $iteration_count, $hash_name, $len);
+  $derived_key2 = pbkdf1_openssl($password, $salt, $iteration_count, $hash_name, $len);
+  $derived_key3 = pbkdf2($password, $salt, $iteration_count, $hash_name, $len);
 
   ### HKDF & co.
-  $derived_key3 = hkdf($keying_material, $salt, $hash_name, $len, $info);
+  $derived_key4 = hkdf($keying_material, $salt, $hash_name, $len, $info);
   $prk  = hkdf_extract($keying_material, $salt, $hash_name);
   $okm1 = hkdf_expand($prk, $hash_name, $len, $info);
 
@@ -51,9 +52,9 @@ Provides an interface to key derivation functions:
 
 =item * Bcrypt-PBKDF as defined by the OpenBSD project
 
-=item * Scrypt according to L<https://tools.ietf.org/html/rfc7914|RFC 7914>
+=item * Scrypt according to L<https://tools.ietf.org/html/rfc7914>
 
-=item * Argon2 according to L<https://tools.ietf.org/html/rfc9106|RFC 9106>
+=item * Argon2 according to L<https://tools.ietf.org/html/rfc9106>
 
 =back
 
@@ -76,6 +77,28 @@ B<BEWARE:> if you are not sure, do not use C<pbkdf1> but rather choose C<pbkdf2>
   $derived_key = pbkdf1($password, $salt);
 
   # $password ......... input keying material  (password)
+  # $salt ............. salt/nonce (expected length: 8)
+  # $iteration_count .. optional, DEFAULT: 5000
+  # $hash_name ........ optional, DEFAULT: 'SHA256'
+  # $len .............. optional, derived key len, DEFAULT: 32
+
+=head2 pbkdf1_openssl
+
+I<Since: CryptX-0.088>
+
+OpenSSL-compatible variant of PBKDF1 (implements C<EVP_BytesToKey>). Unlike strict
+C<pbkdf1>, the output length is not limited to the hash size -- it can be arbitrarily
+long by chaining hash blocks. OpenSSL defaults: C<MD5> hash, C<iteration_count=1>.
+
+  $derived_key = pbkdf1_openssl($password, $salt, $iteration_count, $hash_name, $len);
+  #or
+  $derived_key = pbkdf1_openssl($password, $salt, $iteration_count, $hash_name);
+  #or
+  $derived_key = pbkdf1_openssl($password, $salt, $iteration_count);
+  #or
+  $derived_key = pbkdf1_openssl($password, $salt);
+
+  # $password ......... input keying material (password)
   # $salt ............. salt/nonce (expected length: 8)
   # $iteration_count .. optional, DEFAULT: 5000
   # $hash_name ........ optional, DEFAULT: 'SHA256'
@@ -143,7 +166,7 @@ B<BEWARE:> if you are not sure, do not use C<pbkdf1> but rather choose C<pbkdf2>
 
 bcrypt-based key derivation as defined by the OpenBSD project.
 
-I<Since: CryptX-0.100>
+I<Since: CryptX-0.088>
 
 
   $derived_key = bcrypt_pbkdf($password, $salt, $rounds, $hash_name, $len);
@@ -162,9 +185,9 @@ I<Since: CryptX-0.100>
 
 =head2 scrypt_pbkdf
 
-scrypt key derivation according to L<https://tools.ietf.org/html/rfc7914|RFC 7914>.
+scrypt key derivation according to L<https://tools.ietf.org/html/rfc7914>.
 
-I<Since: CryptX-0.100>
+I<Since: CryptX-0.088>
 
 
   $derived_key = scrypt_pbkdf($password, $salt, $N, $r, $p, $len);
@@ -184,9 +207,9 @@ I<Since: CryptX-0.100>
 
 =head2 argon2_pbkdf
 
-Argon2 key derivation according to L<https://tools.ietf.org/html/rfc9106|RFC 9106>.
+Argon2 key derivation according to L<https://tools.ietf.org/html/rfc9106>.
 
-I<Since: CryptX-0.100>
+I<Since: CryptX-0.088>
 
 
   $derived_key = argon2_pbkdf($type, $password, $salt, $t_cost, $m_factor, $parallelism, $len, $secret, $ad);
