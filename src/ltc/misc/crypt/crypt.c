@@ -137,6 +137,9 @@ const char *crypt_build_settings =
 #if defined(LTC_CHACHA)
    "   ChaCha\n"
 #endif
+#if defined(LTC_XCHACHA20)
+   "   XChaCha20\n"
+#endif
 #if defined(LTC_SALSA20)
    "   Salsa20\n"
 #endif
@@ -380,6 +383,10 @@ const char *crypt_build_settings =
 #if defined(LTC_CURVE25519)
     "   X25519\n"
 #endif
+#endif
+#if defined(LTC_CURVE448)
+    "   Ed448\n"
+    "   X448\n"
 #endif
 #if defined(LTC_PK_MAX_RETRIES)
     "   "NAME_VALUE(LTC_PK_MAX_RETRIES)"\n"
