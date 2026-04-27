@@ -28,6 +28,9 @@ Test::Pod::Spelling->import(
                           OAEP CMAC KDF XOFs WireGuard TLS Parallelizable WPA nonces PSS MACs
                           PNG ITU HDLC gzip PKZIP MODP subgroup eSTREAM NaCl libsodium
                           TurboSHAKE SIV KangarooTwelve XSalsa XOF RSA
+                          stringifiable
+                          RNG
+                          CBC OFB ECB CFB
                           flexi MSB YY BER moduli SubjectPublicKeyInfo
                         )]
                     },
