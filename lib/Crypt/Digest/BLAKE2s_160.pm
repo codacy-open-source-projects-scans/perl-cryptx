@@ -15,6 +15,18 @@ use Carp;
 $Carp::Internal{(__PACKAGE__)}++;
 use Crypt::Digest;
 
+sub new {
+  my ($class) = @_;
+  my $obj = Crypt::Digest->new('BLAKE2s_160');
+  return bless $obj, $class;
+}
+
+sub clone {
+  my ($self) = @_;
+  my $obj = Crypt::Digest::clone($self);
+  return bless $obj, ref($self) || $self;
+}
+
 sub hashsize                { Crypt::Digest::hashsize('BLAKE2s_160')             }
 sub blake2s_160             { Crypt::Digest::digest_data('BLAKE2s_160', @_)      }
 sub blake2s_160_hex         { Crypt::Digest::digest_data_hex('BLAKE2s_160', @_)  }
@@ -92,6 +104,13 @@ Or all of them at once:
 =head2 blake2s_160
 
 Logically joins all arguments into a single string, and returns its BLAKE2s_160 digest encoded as a binary string.
+
+Data arguments for the functional helpers are converted to byte strings using
+Perl's usual scalar stringification. Defined scalars, including numbers and
+string-overloaded objects, are accepted. C<undef> is treated as an empty
+string and may emit Perl's usual "uninitialized value" warning. The same
+rules apply to C<blake2s_160_hex>, C<blake2s_160_b64>, and
+C<blake2s_160_b64u>.
 
  my $blake2s_160_raw = blake2s_160('data string');
  #or
@@ -183,6 +202,11 @@ C<new>, for example:
 
 Appends data to the message. Returns the object itself (for chaining).
 
+Each argument is converted to bytes using Perl's usual scalar stringification.
+Defined scalars, including numbers and string-overloaded objects, are
+accepted. C<undef> is treated as an empty string and may emit Perl's usual
+"uninitialized value" warning.
+
  $d->add('any data');
  #or
  $d->add('any data', 'more data', 'even more data');
@@ -196,12 +220,6 @@ Reads the file content and appends it to the message. Returns the object itself 
  my $filehandle = ...; # existing binary-mode filehandle
  $d->addfile($filehandle);
 
-=head2 add_bits
-
- $d->add_bits($bit_string);   # e.g. $d->add_bits("111100001010");
- #or
- $d->add_bits($data, $nbits); # e.g. $d->add_bits("\xF0\xA0", 16);
-
 =head2 hashsize
 
  $d->hashsize;
@@ -213,24 +231,29 @@ Reads the file content and appends it to the message. Returns the object itself 
 =head2 digest
 
 Returns the binary digest (raw bytes).
+This method does not alter the digest object state, so you can call it
+repeatedly and continue with C<add()> or C<addfile()> afterwards.
 
  my $result_raw = $d->digest();
 
 =head2 hexdigest
 
 Returns the digest encoded as a lowercase hexadecimal string.
+Like C<digest()>, this method does not alter the digest object state.
 
  my $result_hex = $d->hexdigest();
 
 =head2 b64digest
 
 Returns the digest encoded as a Base64 string with trailing C<=> padding.
+Like C<digest()>, this method does not alter the digest object state.
 
  my $result_b64 = $d->b64digest();
 
 =head2 b64udigest
 
 Returns the digest encoded as a Base64 URL Safe string (no trailing C<=>).
+Like C<digest()>, this method does not alter the digest object state.
 
  my $result_b64url = $d->b64udigest();
 

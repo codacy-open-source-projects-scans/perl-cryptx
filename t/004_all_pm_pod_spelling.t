@@ -29,7 +29,9 @@ Test::Pod::Spelling->import(
                           PNG ITU HDLC gzip PKZIP MODP subgroup eSTREAM NaCl libsodium
                           TurboSHAKE SIV KangarooTwelve XSalsa XOF RSA
                           stringifiable
-                          RNG
+                          stringification
+                          stringified
+                          RNG PRNG
                           CBC OFB ECB CFB
                           flexi MSB YY BER moduli SubjectPublicKeyInfo
                         )]

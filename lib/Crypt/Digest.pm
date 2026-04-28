@@ -33,22 +33,29 @@ use CryptX;
 sub addfile {
   my ($self, $file) = @_;
 
-  my $handle;
-  if (ref(\$file) eq 'SCALAR') {        #filename
+  my ($handle, $close_handle);
+  if (ref($file) && eval { defined fileno($file) }) {
+    $handle = $file;
+  }
+  elsif (defined($file) && !ref($file)) {
     open($handle, "<", $file) || croak "FATAL: cannot open '$file': $!";
     binmode($handle);
+    $close_handle = 1;
   }
-  else {                                #handle
-    $handle = $file
+  else {
+    croak "FATAL: invalid handle";
   }
-  croak "FATAL: invalid handle" unless defined $handle;
 
   my $n;
   my $buf = "";
-  while (($n = read($handle, $buf, 32*1024))) {
-    $self->add($buf)
+  {
+    local $SIG{__DIE__} = \&CryptX::_croak;
+    while (($n = read($handle, $buf, 32*1024))) {
+      $self->add($buf)
+    }
+    croak "FATAL: read failed: $!" unless defined $n;
   }
-  croak "FATAL: read failed: $!" unless defined $n;
+  close($handle) if $close_handle;
 
   return $self;
 }
@@ -133,6 +140,7 @@ Please note that all functions take as its first argument the algorithm name, su
  'RIPEMD256', 'RIPEMD320', 'SHA1', 'SHA224', 'SHA256',
  'SHA384', 'SHA512', 'SHA512_224', 'SHA512_256', 'Tiger192', 'Whirlpool',
  'SHA3_224', 'SHA3_256', 'SHA3_384', 'SHA3_512',
+ 'Keccak224', 'Keccak256', 'Keccak384', 'Keccak512',
  'BLAKE2b_160', 'BLAKE2b_256', 'BLAKE2b_384', 'BLAKE2b_512',
  'BLAKE2s_128', 'BLAKE2s_160', 'BLAKE2s_224', 'BLAKE2s_256'
 
@@ -142,6 +150,12 @@ Please note that all functions take as its first argument the algorithm name, su
 
 Logically joins all arguments into a single string, and returns the digest for
 the selected algorithm encoded as a binary string.
+
+Data arguments are converted to byte strings using Perl's usual scalar
+stringification. Defined scalars, including numbers and string-overloaded
+objects, are accepted. C<undef> is treated as an empty string and may emit
+Perl's usual "uninitialized value" warning. The same rules apply to
+C<digest_data_hex>, C<digest_data_b64>, and C<digest_data_b64u>.
 
  my $digest_raw = digest_data('SHA256', 'data string');
  #or
@@ -251,6 +265,11 @@ Reinitialize the digest object state and returns a reference to the digest objec
 All arguments are appended to the message we calculate digest for.
 The return value is the digest object itself.
 
+Each argument is converted to bytes using Perl's usual scalar stringification.
+Defined scalars, including numbers and string-overloaded objects, are
+accepted. C<undef> is treated as an empty string and may emit Perl's usual
+"uninitialized value" warning.
+
  $d->add('any data');
  #or
  $d->add('any data', 'more data', 'even more data');
@@ -283,17 +302,6 @@ The return value is the digest object itself.
 
 B<BEWARE:> You have to make sure that the filehandle is in binary mode before you pass it as argument to the addfile() method.
 
-=head2 add_bits
-
-This method is available mostly for compatibility with other Digest::SOMETHING modules on CPAN, you are very unlikely to need it.
-The return value is the digest object itself.
-
- $d->add_bits($bit_string);   # e.g. $d->add_bits("111100001010");
- #or
- $d->add_bits($data, $nbits); # e.g. $d->add_bits("\xF0\xA0", 16);
-
-B<BEWARE:> It is not possible to add bits that are not a multiple of 8.
-
 =head2 hashsize
 
 Returns the length of calculated digest in bytes (e.g. 32 for SHA-256).
@@ -307,12 +315,15 @@ Returns the length of calculated digest in bytes (e.g. 32 for SHA-256).
 =head2 digest
 
 Returns the binary digest (raw bytes).
+This method does not alter the digest object state, so you can call it
+repeatedly and continue with C<add()> or C<addfile()> afterwards.
 
  my $result_raw = $d->digest();
 
 =head2 hexdigest
 
 Returns the digest encoded as a hexadecimal string.
+Like C<digest()>, this method does not alter the digest object state.
 
  my $result_hex = $d->hexdigest();
 
@@ -320,12 +331,14 @@ Returns the digest encoded as a hexadecimal string.
 
 Returns the digest encoded as a Base64 string, B<with> trailing '=' padding (B<BEWARE:> this padding
 style might differ from other Digest::<SOMETHING> modules on CPAN).
+Like C<digest()>, this method does not alter the digest object state.
 
  my $result_b64 = $d->b64digest();
 
 =head2 b64udigest
 
 Returns the digest encoded as a Base64 URL Safe string (see RFC 4648 section 5).
+Like C<digest()>, this method does not alter the digest object state.
 
  my $result_b64url = $d->b64udigest();
 

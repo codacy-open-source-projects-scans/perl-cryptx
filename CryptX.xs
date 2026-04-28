@@ -48,11 +48,26 @@ STATIC int cryptx_internal_input_has_no_payload(const char *in, STRLEN len) {
 typedef adler32_state           *Crypt__Checksum__Adler32;
 typedef crc32_state             *Crypt__Checksum__CRC32;
 
-typedef ccm_state               *Crypt__AuthEnc__CCM;
-typedef eax_state               *Crypt__AuthEnc__EAX;
-typedef gcm_state               *Crypt__AuthEnc__GCM;
-typedef chacha20poly1305_state  *Crypt__AuthEnc__ChaCha20Poly1305;
-typedef ocb3_state              *Crypt__AuthEnc__OCB;
+typedef struct cryptx_authenc_ccm_struct {
+  ccm_state state;
+  int finalized;
+} *Crypt__AuthEnc__CCM;
+typedef struct cryptx_authenc_eax_struct {
+  eax_state state;
+  int finalized;
+} *Crypt__AuthEnc__EAX;
+typedef struct cryptx_authenc_gcm_struct {
+  gcm_state state;
+  int finalized;
+} *Crypt__AuthEnc__GCM;
+typedef struct cryptx_authenc_chacha20poly1305_struct {
+  chacha20poly1305_state state;
+  int finalized;
+} *Crypt__AuthEnc__ChaCha20Poly1305;
+typedef struct cryptx_authenc_ocb_struct {
+  ocb3_state state;
+  int finalized;
+} *Crypt__AuthEnc__OCB;
 
 typedef chacha_state            *Crypt__Stream__ChaCha;
 typedef salsa20_state           *Crypt__Stream__Salsa20;
@@ -61,15 +76,42 @@ typedef rabbit_state            *Crypt__Stream__Rabbit;
 typedef rc4_state               *Crypt__Stream__RC4;
 typedef sober128_state          *Crypt__Stream__Sober128;
 
-typedef f9_state                *Crypt__Mac__F9;
-typedef hmac_state              *Crypt__Mac__HMAC;
-typedef omac_state              *Crypt__Mac__OMAC;
-typedef pelican_state           *Crypt__Mac__Pelican;
-typedef pmac_state              *Crypt__Mac__PMAC;
-typedef xcbc_state              *Crypt__Mac__XCBC;
-typedef poly1305_state          *Crypt__Mac__Poly1305;
-typedef blake2smac_state        *Crypt__Mac__BLAKE2s;
-typedef blake2bmac_state        *Crypt__Mac__BLAKE2b;
+typedef struct cryptx_mac_f9_struct {
+  f9_state state;
+  int finalized;
+} *Crypt__Mac__F9;
+typedef struct cryptx_mac_hmac_struct {
+  hmac_state state;
+  int finalized;
+} *Crypt__Mac__HMAC;
+typedef struct cryptx_mac_omac_struct {
+  omac_state state;
+  int finalized;
+} *Crypt__Mac__OMAC;
+typedef struct cryptx_mac_pelican_struct {
+  pelican_state state;
+  int finalized;
+} *Crypt__Mac__Pelican;
+typedef struct cryptx_mac_pmac_struct {
+  pmac_state state;
+  int finalized;
+} *Crypt__Mac__PMAC;
+typedef struct cryptx_mac_xcbc_struct {
+  xcbc_state state;
+  int finalized;
+} *Crypt__Mac__XCBC;
+typedef struct cryptx_mac_poly1305_struct {
+  poly1305_state state;
+  int finalized;
+} *Crypt__Mac__Poly1305;
+typedef struct cryptx_mac_blake2s_struct {
+  blake2smac_state state;
+  int finalized;
+} *Crypt__Mac__BLAKE2s;
+typedef struct cryptx_mac_blake2b_struct {
+  blake2bmac_state state;
+  int finalized;
+} *Crypt__Mac__BLAKE2b;
 
 typedef struct cipher_struct {          /* used by Crypt::Cipher */
   symmetric_key skey;
@@ -81,9 +123,60 @@ typedef struct digest_struct {          /* used by Crypt::Digest */
   struct ltc_hash_descriptor *desc;
 } *Crypt__Digest;
 
+/* SHA1 and SHA224/SHA256 keep their working state behind an internal pointer
+ * that is aligned into state_buf during init. After copying the struct, that
+ * pointer still targets the original object's buffer, so we must rebind it to
+ * the copied storage before using the clone/state copy. */
+STATIC void cryptx_internal_digest_fixup_state(Crypt__Digest digest) {
+  const char *name;
+  const UV mask = (UV)16 - 1;
+  UV value;
+
+  if (digest == NULL || digest->desc == NULL || digest->desc->name == NULL) return;
+  name = digest->desc->name;
+
+  if (strcmp(name, "sha1") == 0) {
+    value = PTR2UV(digest->state.sha1.state_buf);
+    digest->state.sha1.state = INT2PTR(ulong32 *, (value + mask) & ~mask);
+    return;
+  }
+
+  if (strcmp(name, "sha224") == 0 || strcmp(name, "sha256") == 0) {
+    value = PTR2UV(digest->state.sha256.state_buf);
+    digest->state.sha256.state = INT2PTR(ulong32 *, (value + mask) & ~mask);
+    return;
+  }
+}
+
+/* HMAC embeds a hash_state directly, so copying hmac_state has the same
+ * internal-pointer problem for SHA1 and SHA224/SHA256 that affects
+ * Crypt::Digest state copies. */
+STATIC void cryptx_internal_hmac_fixup_state(hmac_state *hmac) {
+  const char *name;
+  const UV mask = (UV)16 - 1;
+  UV value;
+
+  if (hmac == NULL || hmac->hash < 0 || hmac->hash >= TAB_SIZE) return;
+  if (hash_descriptor[hmac->hash].name == NULL) return;
+  name = hash_descriptor[hmac->hash].name;
+
+  if (strcmp(name, "sha1") == 0) {
+    value = PTR2UV(hmac->md.sha1.state_buf);
+    hmac->md.sha1.state = INT2PTR(ulong32 *, (value + mask) & ~mask);
+    return;
+  }
+
+  if (strcmp(name, "sha224") == 0 || strcmp(name, "sha256") == 0) {
+    value = PTR2UV(hmac->md.sha256.state_buf);
+    hmac->md.sha256.state = INT2PTR(ulong32 *, (value + mask) & ~mask);
+    return;
+  }
+}
+
 typedef struct digest_shake_struct {    /* used by Crypt::Digest::SHAKE */
   hash_state state;
   int num;
+  int squeezing;
 } *Crypt__Digest__SHAKE;
 
 typedef struct cbc_struct {             /* used by Crypt::Mode::CBC */
@@ -238,6 +331,7 @@ STATIC void cryptx_internal_pk_prng_reseed(prng_state *state, int pindex, IV *la
   if (rv != CRYPT_OK) croak("FATAL: PRNG_add_entropy failed: %s", error_to_string(rv));
   rv = prng_descriptor[pindex].ready(state);
   if (rv != CRYPT_OK) croak("FATAL: PRNG_ready failed: %s", error_to_string(rv));
+  zeromem(entropy_buf, sizeof(entropy_buf));
   *last_pid = curpid;
 }
 
@@ -417,7 +511,7 @@ STATIC int cryptx_internal_ecc_set_curve_from_SV(ecc_key *key, SV *curve)
 
   if (!SvOK(curve)) croak("FATAL: undefined curve");
 
-  if (SvPOK(curve)) {
+  if (SvPOK_spec(curve)) {
     /* string */
     ptr_crv = SvPV(curve, len_crv);
     if ((hc = get_hv("Crypt::PK::ECC::curve", 0)) == NULL) croak("FATAL: no curve register");
@@ -437,7 +531,7 @@ STATIC int cryptx_internal_ecc_set_curve_from_SV(ecc_key *key, SV *curve)
     croak("FATAL: curve has to be a string or a hashref");
   }
 
-  if (SvPOK(sv_crv)) {
+  if (SvPOK_spec(sv_crv)) {
     /* string - curve name */
     const ltc_ecc_curve *cu;
     ptr_crv = SvPV(sv_crv, len_crv);
