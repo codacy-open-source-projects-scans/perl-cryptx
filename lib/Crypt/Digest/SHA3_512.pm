@@ -4,7 +4,7 @@ package Crypt::Digest::SHA3_512;
 
 use strict;
 use warnings;
-our $VERSION = '0.088_001';
+our $VERSION = '0.088_004';
 
 use base qw(Crypt::Digest Exporter);
 our %EXPORT_TAGS = ( all => [qw( sha3_512 sha3_512_hex sha3_512_b64 sha3_512_b64u sha3_512_file sha3_512_file_hex sha3_512_file_b64 sha3_512_file_b64u )] );
@@ -231,29 +231,30 @@ Reads the file content and appends it to the message. Returns the object itself 
 =head2 digest
 
 Returns the binary digest (raw bytes).
-This method does not alter the digest object state, so you can call it
-repeatedly and continue with C<add()> or C<addfile()> afterwards.
+The first call finalizes the digest object. Any later C<add()>,
+C<addfile()>, C<digest()>, C<hexdigest()>, C<b64digest()>, or
+C<b64udigest()> call will fail until you call C<reset()>.
 
  my $result_raw = $d->digest();
 
 =head2 hexdigest
 
 Returns the digest encoded as a lowercase hexadecimal string.
-Like C<digest()>, this method does not alter the digest object state.
+Like C<digest()>, the first call finalizes the digest object.
 
  my $result_hex = $d->hexdigest();
 
 =head2 b64digest
 
 Returns the digest encoded as a Base64 string with trailing C<=> padding.
-Like C<digest()>, this method does not alter the digest object state.
+Like C<digest()>, the first call finalizes the digest object.
 
  my $result_b64 = $d->b64digest();
 
 =head2 b64udigest
 
 Returns the digest encoded as a Base64 URL Safe string (no trailing C<=>).
-Like C<digest()>, this method does not alter the digest object state.
+Like C<digest()>, the first call finalizes the digest object.
 
  my $result_b64url = $d->b64udigest();
 

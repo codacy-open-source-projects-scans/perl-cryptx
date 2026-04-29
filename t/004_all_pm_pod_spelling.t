@@ -34,11 +34,15 @@ Test::Pod::Spelling->import(
                           RNG PRNG
                           CBC OFB ECB CFB
                           flexi MSB YY BER moduli SubjectPublicKeyInfo
+                          rarr UTCTime TLV
+                          OpenSSH codecs
+                          undef adata
+                          pre Edctx Edph
                         )]
                     },
 );
 
-plan tests => 109;
+plan tests => 119;
 
 my @files;
 File::Find::find({ wanted=>sub { push @files, $_ if /\.pm$/ }, no_chdir=>1 }, 'lib');

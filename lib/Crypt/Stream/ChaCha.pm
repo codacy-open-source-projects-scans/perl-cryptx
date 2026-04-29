@@ -2,7 +2,7 @@ package Crypt::Stream::ChaCha;
 
 use strict;
 use warnings;
-our $VERSION = '0.088_001';
+our $VERSION = '0.088_004';
 
 use CryptX;
 
@@ -85,7 +85,7 @@ Returns a copy of the stream cipher object in its current state.
 
 =over
 
-=item * L<Crypt::Stream::RC4>, L<Crypt::Stream::Sober128>, L<Crypt::Stream::Salsa20>, L<Crypt::Stream::Sosemanuk>
+=item * L<Crypt::Stream::XChaCha>, L<Crypt::Stream::RC4>, L<Crypt::Stream::Sober128>, L<Crypt::Stream::Salsa20>, L<Crypt::Stream::Sosemanuk>
 
 =item * L<https://www.rfc-editor.org/rfc/rfc7539>
 

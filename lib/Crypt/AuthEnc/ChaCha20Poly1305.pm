@@ -2,7 +2,7 @@ package Crypt::AuthEnc::ChaCha20Poly1305;
 
 use strict;
 use warnings;
-our $VERSION = '0.088_001';
+our $VERSION = '0.088_004';
 
 require Exporter; our @ISA = qw(Exporter); ### use Exporter 5.57 'import';
 our %EXPORT_TAGS = ( all => [qw( chacha20poly1305_encrypt_authenticate chacha20poly1305_decrypt_verify )] );
@@ -183,7 +183,7 @@ Returns a copy of the AEAD object in its current state.
 
 =over
 
-=item * L<CryptX|CryptX>, L<Crypt::AuthEnc::GCM|Crypt::AuthEnc::GCM>, L<Crypt::AuthEnc::CCM|Crypt::AuthEnc::CCM>, L<Crypt::AuthEnc::EAX|Crypt::AuthEnc::EAX>, L<Crypt::AuthEnc::OCB|Crypt::AuthEnc::OCB>
+=item * L<CryptX|CryptX>, L<Crypt::AuthEnc::XChaCha20Poly1305|Crypt::AuthEnc::XChaCha20Poly1305>, L<Crypt::AuthEnc::GCM|Crypt::AuthEnc::GCM>, L<Crypt::AuthEnc::CCM|Crypt::AuthEnc::CCM>, L<Crypt::AuthEnc::EAX|Crypt::AuthEnc::EAX>, L<Crypt::AuthEnc::OCB|Crypt::AuthEnc::OCB>
 
 =item * L<https://www.rfc-editor.org/rfc/rfc7539>
 

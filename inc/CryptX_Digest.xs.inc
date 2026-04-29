@@ -30,7 +30,7 @@ void
 DESTROY(Crypt::Digest self)
     CODE:
     {
-        zeromem(&self->state, sizeof(hash_state));
+        zeromem(self, sizeof(*self));
         Safefree(self);
     }
 
@@ -41,17 +41,19 @@ reset(Crypt::Digest self)
         int rv;
         rv = self->desc->init(&self->state);
         if (rv != CRYPT_OK) croak("FATAL: digest init failed: %s", error_to_string(rv));
+        self->finalized = 0;
         XPUSHs(ST(0)); /* return self */
     }
 
 Crypt::Digest
 clone(Crypt::Digest self)
     CODE:
+        if (self->desc != NULL && cryptx_internal_noclone_hash(self->desc->name)) {
+          croak("FATAL: clone is not supported for given hash state");
+        }
         Newz(0, RETVAL, 1, struct digest_struct);
         if (!RETVAL) croak("FATAL: Newz failed");
         Copy(self, RETVAL, 1, struct digest_struct);
-        /* Repair SHA1/SHA224/SHA256 internal state pointers after the copy. */
-        cryptx_internal_digest_fixup_state(RETVAL);
     OUTPUT:
         RETVAL
 
@@ -63,6 +65,7 @@ add(Crypt::Digest self, ...)
         int rv, i;
         unsigned char *in;
 
+        if (self->finalized) croak("FATAL: digest object already finalized");
         for(i = 1; i < items; i++) {
           in = (unsigned char *)SvPVbyte(ST(i), inlen);
           if (inlen > 0) {
@@ -85,13 +88,11 @@ digest(Crypt::Digest self)
         unsigned long outlen;
         unsigned char hash[MAXBLOCKSIZE];
         char out[MAXBLOCKSIZE*2+1];
-        struct digest_struct state_copy;
 
-        Copy(self, &state_copy, 1, struct digest_struct);
-        /* Finalize a fixed-up copy so digest accessors stay non-destructive. */
-        cryptx_internal_digest_fixup_state(&state_copy);
-        rv = state_copy.desc->done(&state_copy.state, hash);
+        if (self->finalized) croak("FATAL: digest object already finalized");
+        rv = self->desc->done(&self->state, hash);
         if (rv != CRYPT_OK) croak("FATAL: digest done failed: %s", error_to_string(rv));
+        self->finalized = 1;
 
         outlen = sizeof(out);
         if (ix == 3) {

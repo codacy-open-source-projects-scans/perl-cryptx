@@ -2,7 +2,7 @@ package Crypt::PK::Ed25519;
 
 use strict;
 use warnings;
-our $VERSION = '0.088_001';
+our $VERSION = '0.088_004';
 
 require Exporter; our @ISA = qw(Exporter); ### use Exporter 5.57 'import';
 our %EXPORT_TAGS = ( all => [qw( )] );
@@ -104,8 +104,8 @@ sub export_key_pem {
   local $SIG{__DIE__} = \&CryptX::_croak;
   my $key = $self->export_key_der($type||'');
   return unless $key;
-  return der_to_pem($key, "PRIVATE KEY", $password, $cipher) if substr($type, 0, 7) eq 'private';
-  return der_to_pem($key, "PUBLIC KEY") if substr($type,0, 6) eq 'public';
+  return der_to_pem($key, "PRIVATE KEY", $password, $cipher) if $type eq 'private';
+  return der_to_pem($key, "PUBLIC KEY") if $type eq 'public';
 }
 
 sub export_key_jwk {
@@ -182,8 +182,8 @@ immediately import the key material into the new object.
 
 =head2 generate_key
 
-Uses Yarrow-based cryptographically strong random number generator seeded with
-random data taken from C</dev/random> (UNIX) or C<CryptGenRandom> (Win32).
+Uses the bundled C<chacha20> PRNG via C<rng_make_prng()>. The exact OS entropy
+source is handled by the underlying LibTomCrypt RNG setup.
 Returns the object itself (for chaining).
 
  $pk->generate_key;
@@ -397,6 +397,47 @@ Returns the signature as a binary string. Ed25519 uses a fixed hash internally
 Returns C<1> if the signature is valid, C<0> otherwise.
 
  my $valid = $pub->verify_message($signature, $message);
+
+=head2 sign_message_ctx
+
+I<Since: CryptX-0.100>
+
+Signs a message using Ed25519ctx (RFC 8032 Section 5.1), which includes a
+mandatory context string (at most 255 bytes). The context string makes the
+signature domain-separated: the same key signing the same message with a
+different context produces a different (and incompatible) signature.
+
+ my $signature = $priv->sign_message_ctx($message, $context);
+
+=head2 verify_message_ctx
+
+I<Since: CryptX-0.100>
+
+Verifies a signature produced by L</sign_message_ctx>.
+
+ my $valid = $pub->verify_message_ctx($signature, $message, $context);
+
+=head2 sign_message_ph
+
+I<Since: CryptX-0.100>
+
+Signs a message using Ed25519ph (RFC 8032 Section 5.1), the "pre-hashed"
+variant. The message is first hashed with SHA-512 internally before signing.
+This is useful when signing very large messages or when only a hash of the
+message is available. An optional context string (at most 255 bytes) can be
+provided; it defaults to the empty string if omitted.
+
+ my $signature = $priv->sign_message_ph($message);
+ my $signature = $priv->sign_message_ph($message, $context);
+
+=head2 verify_message_ph
+
+I<Since: CryptX-0.100>
+
+Verifies a signature produced by L</sign_message_ph>.
+
+ my $valid = $pub->verify_message_ph($signature, $message);
+ my $valid = $pub->verify_message_ph($signature, $message, $context);
 
 =head2 is_private
 

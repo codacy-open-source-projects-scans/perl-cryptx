@@ -2,7 +2,7 @@ package Crypt::PK::DH;
 
 use strict;
 use warnings;
-our $VERSION = '0.088_001';
+our $VERSION = '0.088_004';
 
 require Exporter; our @ISA = qw(Exporter); ### use Exporter 5.57 'import';
 our %EXPORT_TAGS = ( all => [qw( dh_shared_secret )] );
@@ -11,7 +11,6 @@ our @EXPORT = qw();
 
 use Carp;
 use CryptX;
-use Crypt::Digest 'digest_data';
 use Crypt::Misc qw(read_rawfile pem_to_der);
 
 my %DH_PARAMS = (
